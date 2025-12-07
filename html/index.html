@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Typing Race Game</title>
+<style>
+  /* ==============================
+     Global Styles
+     ============================== */
+  body{
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    background:#111;
+    color:#eee;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100vh;
+  }
+  h1{
+    margin:0.5rem 0;
+    font-size:2rem;
+    color:#ffdd38;
+  }
+  button{
+    padding:0.4rem 1rem;
+    margin:0 0.3rem;
+    border:none;
+    border-radius:4px;
+    background:#333;
+    color:#eee;
+    cursor:pointer;
+    transition:background 0.3s;
+  }
+  button:hover{background:#555}
+  button:focus{outline:none}
+
+  /* ==============================
+     Stats Bar
+     ============================== */
+  #stats{
+    display:flex;
+    gap:1.5rem;
+    margin:1rem 0;
+  }
+  .stat-card{
+    background:#222;
+    padding:0.5rem 1rem;
+    border-radius:4px;
+    text-align:center;
+    min-width:80px;
+  }
+  .stat-card span{display:block}
+  .stat-title{font-size:0.8rem}
+  .stat-value{font-size:1.2rem;font-weight:bold}
+
+  /* ==============================
+     Text Display Area
+     ============================== */
+  #text-display{
+    font-size:1.6rem;
+    line-height:1.5;
+    max-width:700px;
+    margin:0 1rem;
+    text-align:center;
+    word-wrap:break-word;
+    min-height:4rem;
+  }
+  #text-display .typed{color:#4caf50}
+  #text-display .wrong{color:#f44336}
+  #text-display .current{background:#ff8800}
+  #text-display .untyped{color:#888}
+
+  /* ==============================
+     Input Field
+     ============================== */
+  #input-field{
+    width:700px;
+    font-size:1.6rem;
+    background:#222;
+    padding:0.5rem;
+    border:none;
+    color:#eee;
+    border-radius:4px;
+    margin-top:1rem;
+    transition:border 0.3s;
+  }
+  #input-field:focus{
+    border:2px solid #ff8800;
+    box-shadow:0 0 10px #ff8800;
+  }
+
+  /* ==============================
+     Racing Track Visualization
+     ============================== */
+  #track-container{
+    position:relative;
+    width:700px;
+    height:60px;
+    margin:1.5rem 0;
+    background:#444;
+    border-radius:6px;
+    overflow:hidden;
+    border:4px solid #222;
+  }
+  #track{
+    height:100%;
+    background:linear-gradient(90deg,#555,#666);
+    position:relative;
+    display:flex;
+    align-items:center;
+  }
+  /* dashed center line */
+  #track::before{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    height:4px;
+    background:repeating-linear-gradient(90deg,transparent,transparent 10px,#222 10px,#222 20px);
+    transform:translateY(-50%);
+  }
+  /* finish line */
+  #finish-line{
+    position:absolute;
+    right:0;
+    top:0;
+    width:40px;
+    height:100%;
+    background:#222;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transform:skewX(-20deg);
+  }
+  #finish-line::before{
+    content:"";
+    position:absolute;
+    width:100%;
+    height:100%;
+    background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="100%" height="100%" fill="none"><animate attributeName="height" values="0;100%;0" dur="1s" repeatCount="indefinite"/></rect></svg>') repeat;
+    transform:skewX(20deg);
+  }
+
+  /* car styling */
+  .car{
+    position:absolute;
+    top:50%;
+    left:0;
+    width:60px;
+    height:30px;
+    transform:translateY(-50%);
+    transition:transform 0.1s ease-out;
+    z-index:2;
+  }
+  .car img{
+    width:100%;
+    height:100%;
+  }
+  /* competitor ghosts */
+  .ghost{opacity:0.4;transform:translateY(-50%) scaleY(0.9)}
+  .ghost img{filter:grayscale(100%)}
+
+  /* ==============================
+     Result Modal
+     ============================== */
+  #overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.8);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.3s;
+  }
+  #overlay.show{opacity:1;pointer-events:auto}
+  #results{
+    background:#222;
+    padding:2rem;
+    border-radius:8px;
+    text-align:center;
+    width:80%;
+    max-width:500px;
+  }
+  #results h2{margin-bottom:1rem;font-size:1.8rem}
+  #results .stat{
+    margin:0.5rem 0;
+    font-size:1.2rem;
+  }
+  #results button{margin-top:1rem}
+</style>
+</head>
+<body>
+
+<h1>🏎️ <span id="game-title">Typing Race</span> 🎉</h1>
+
+<!-- Stats Panel -->
+<div id="stats">
+  <div class="stat-card"><span id="wpm" class="stat-value">0</span><span class="stat-title">WPM</span></div>
+  <div class="stat-card"><span id="acc" class="stat-value">0%</span><span class="stat-title">Accuracy</span></div>
+  <div class="stat-card"><span id="timer" class="stat-value">0.00</span><span class="stat-title">Time</span></div>
+</div>
+
+<!-- Difficulty Selector -->
+<div id="controls">
+  <label>Difficulty: </label>
+  <button data-diff="easy" class="diff-btn">Easy</button>
+  <button data-diff="medium" class="diff-btn">Medium</button>
+  <button data-diff="hard" class="diff-btn">Hard</button>
+</div>
+
+<!-- Text Display -->
+<div id="text-display"></div>
+
+<!-- Input Field -->
+<input type="text" id="input-field" autocomplete="off" placeholder="Tap Start...">
+
+<!-- Racing Track -->
+<div id="track-container">
+  <div id="track">
+    <div id="finish-line"></div>
+    <img src="https://cdn-icons-png.flaticon.com/512/42/42609.png" alt="player car" class="car player-car">
+  </div>
+</div>
+
+<!-- Overlay: Results -->
+<div id="overlay">
+  <div id="results">
+    <h2>Race Finished!</h2>
+    <div class="stat">WPM: <span id="final-wpm"></span></div>
+    <div class="stat">Accuracy: <span id="final-acc"></span></div>
+    <div class="stat">Time: <span id="final-time"></span></div>
+    <button id="restart-btn">Race Again</button>
+    <button id="new-text-btn">New Text</button>
+  </div>
+</div>
+
+<script>
+/* ==============================
+   Game Constants & Variables
+   ============================== */
+const textBank = {
+  easy: [
+    "The quick brown fox jumps over the lazy dog.",
+    "Hello world! This is a simple test."
+  ],
+  medium: [
+    "Typing games help improve your keyboard accuracy and speed while making the learning process enjoyable and competitive.",
+    "Practice your fingers—each keystroke is a lap in this thrilling racing experience."
+  ],
+  hard: [
+    "Consistent training and deliberate practice are crucial factors for honing typing proficiency and achieving high-speed performance across diverse typographic contexts.",
+    "Leveraging muscle memory, strategic pacing, and mindful error management can significantly elevate your overall typing competence beyond baseline expectations."
+  ]
+};
+const themeColors = {
+  default: '#ff8800',
+  f1: '#ff0000',
+  street: '#008cff',
+  space: '#006400'
+};
+let currentDifficulty = 'easy';
+let currentText = '';
+let startTime = null;
+let timerInterval = null;
+let typedChars = 0;
+let correctChars = 0;
+let totalChars = 0;
+let carPosition = 0;
+let lastCarUpdate = Date.now();
+
+// Grab DOM elements
+const textDisplay = document.getElementById('text-display');
+const inputField = document.getElementById('input-field');
+const wpmDisplay = document.getElementById('wpm');
+const accDisplay = document.getElementById('acc');
+const timerDisplay = document.getElementById('timer');
+const overlay = document.getElementById('overlay');
+const finalWPM = document.getElementById('final-wpm');
+const finalAcc = document.getElementById('final-acc');
+const finalTime = document.getElementById('final-time');
+const restartBtn = document.getElementById('restart-btn');
+const newTextBtn = document.getElementById('new-text-btn');
+const diffButtons = document.querySelectorAll('.diff-btn');
+
+// =============================
+// Helper Functions
+// =============================
+function formatTime(ms) {
+  return (ms / 1000).toFixed(2);
+}
+function updateStats() {
+  const elapsed = Date.now() - startTime;
+  timerDisplay.textContent = formatTime(elapsed);
+  const minutes = elapsed / 60000;
+  const wpm = minutes > 0 ? Math.round((correctChars / 5) / minutes) : 0;
+  wpmDisplay.textContent = wpm;
+  const accuracy = totalChars > 0 ? Math.round((correctChars / totalChars) * 100) : 0;
+  accDisplay.textContent = accuracy + '%';
+  // Move player car
+  const trackWidth = document.getElementById('track-container').offsetWidth - 60; // subtract car width
+  carPosition = Math.min((typedChars / totalChars) * trackWidth, trackWidth);
+  const car = document.querySelector('.player-car');
+  car.style.transform = `translate(${carPosition}px, -50%)`;
+}
+function commitResult() {
+  clearInterval(timerInterval);
+  const elapsed = Date.now() - startTime;
+  finalWPM.textContent = wpmDisplay.textContent;
+  finalAcc.textContent = accDisplay.textContent;
+  finalTime.textContent = timerDisplay.textContent;
+  overlay.classList.add('show');
+  // Store personal best
+  const bestKey = `best-${currentDifficulty}`;
+  const currentBest = localStorage.getItem(bestKey);
+  if (!currentBest || parseInt(currentBest) < parseInt(wpmDisplay.textContent)) {
+    localStorage.setItem(bestKey, wpmDisplay.textContent);
+  }
+}
+function resetGame(newText = false) {
+  clearInterval(timerInterval);
+  inputField.value = '';
+  inputField.disabled = false;
+  inputField.focus();
+  textDisplay.innerHTML = '';
+  typedChars = correctChars = totalChars = 0;
+  carPosition = 0;
+  // Set new text if requested
+  if (newText) {
+    currentText = textBank[currentDifficulty][Math.floor(Math.random() * textBank[currentDifficulty].length)];
+  }
+  // Prepare display
+  totalChars = currentText.length;
+  currentText.split('').forEach((char, idx) => {
+    const span = document.createElement('span');
+    span.textContent = char;
+    span.className = 'untyped';
+    if (idx === 0) span.classList.add('current');
+    textDisplay.appendChild(span);
+  });
+}
+function startGame() {
+  inputField.disabled = false;
+  inputField.focus();
+  startTime = Date.now();
+  timerInterval = setInterval(updateStats, 100);
+}
+function handleInput(e) {
+  if (!startTime) {
+    startGame();
+    startTime = Date.now();
+  }
+  const val = inputField.value;
+  typedChars = val.length;
+  // Compare each character
+  const spans = textDisplay.querySelectorAll('span');
+  let newCorrect = 0;
+  spans.forEach((span, idx) => {
+    const char = currentText[idx];
+    const typedChar = val[idx];
+    span.classList.remove('typed','wrong','current');
+    if (idx < typedChars) {
+      if (typedChar === char) {
+        span.classList.add('typed', 'correct');
+        newCorrect++;
+      } else {
+        span.classList.add('wrong');
+      }
+    } else if (idx === typedChars) {
+      span.classList.add('current');
+    } else {
+      span.classList.add('untyped');
+    }
+  });
+  correctChars = newCorrect;
+  // Check completion
+  if (typedChars === totalChars) {
+    commitResult();
+  }
+}
+// =============================
+// Event Listeners
+// =============================
+inputField.addEventListener('input', handleInput);
+restartBtn.addEventListener('click', () => {
+  overlay.classList.remove('show');
+  resetGame();
+});
+newTextBtn.addEventListener('click', () => {
+  overlay.classList.remove('show');
+  resetGame(true);
+});
+diffButtons.forEach(btn => btn.addEventListener('click', () => {
+  diffButtons.forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  currentDifficulty = btn.dataset.diff;
+  resetGame(true);
+}));
+
+// =============================
+// Initialization on Page Load
+// =============================
+window.addEventListener('load', () => {
+  // Default difficulty
+  diffButtons[0].classList.add('selected');
+  currentText = textBank[currentDifficulty][0];
+  resetGame();
+  inputField.disabled = false;
+  inputField.focus();
+});
+</script>
+</body>
+</html>

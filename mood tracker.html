@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Daily Mood Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+/* Basic Reset */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Layout */
+body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 2rem; }
+header { text-align: center; margin-bottom: 1.5rem; }
+header h1 { font-size: 2rem; color: #333; }
+
+/* Cards Grid */
+main { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.card { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+.card h3 { margin-bottom: 0.5rem; font-size: 1.2rem; color: #555; }
+
+/* Mood Buttons */
+.mood-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: background 0.2s, color 0.2s;
+}
+.mood-btn:focus { outline: 2px solid #007BFF; outline-offset: 2px; }
+.mood-btn[aria-pressed="true"] {
+    background: #007BFF;
+    color: #fff;
+    border-radius: 4px;
+}
+
+/* Summary */
+#summary {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    font-size: 1.1rem;
+}
+#summary p { margin: 0.5rem 0; }
+@media (max-width: 500px) {
+    #summary { flex-direction: column; align-items: center; }
+}
+</style>
+</head>
+<body>
+<header>
+    <h1>Daily Mood Tracker</h1>
+</header>
+<main id="cards-container"></main>
+<div id="summary" aria-live="polite" aria-label="Mood summary">
+    <p>Happy: <span id="happy-count">0</span></p>
+    <p>Neutral: <span id="neutral-count">0</span></p>
+    <p>Sad: <span id="sad-count">0</span></p>
+</div>
+<script>
+/*=============================================================
+  Daily Mood Tracker
+  Vanilla JS, HTML & CSS
+  =============================================================*/
+
+// Constants
+const daysOfWeek = [ 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday' ];
+const moods = [ 'happy', 'neutral', 'sad' ];
+const emojiMap = { happy: '😊', neutral: '😐', sad: '🙁' };
+const storageKey = 'moodSelections';
+
+// DOM Elements
+const cardsContainer = document.getElementById('cards-container');
+const happyCountEl = document.getElementById('happy-count');
+const neutralCountEl = document.getElementById('neutral-count');
+const sadCountEl = document.getElementById('sad-count');
+
+// Retrieve stored selections or initialize empty
+let moodSelections = {};
+try {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) moodSelections = JSON.parse(stored);
+} catch (e) {
+    console.warn('Failed to load mood selections from localStorage:', e);
+}
+
+// Create cards for each day
+daysOfWeek.forEach(day => {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = day;
+    card.appendChild(h3);
+
+    moods.forEach(mood => {
+        const btn = document.createElement('button');
+        btn.className = 'mood-btn';
+        btn.type = 'button';
+        btn.setAttribute('data-day', day);
+        btn.setAttribute('data-mood', mood);
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-label', `${mood} mood for ${day}`);
+        btn.textContent = emojiMap[mood];
+        // Highlight if previously selected
+        if (moodSelections[day] === mood) {
+            btn.setAttribute('aria-pressed', 'true');
+            btn.classList.add('selected');
+        }
+
+        btn.addEventListener('click', () => {
+            // Remove previous selection for this day
+            const prevMood = moodSelections[day];
+            if (prevMood) {
+                const prevBtn = card.querySelector(`button[data-mood="${prevMood}"]`);
+                if (prevBtn) {
+                    prevBtn.setAttribute('aria-pressed', 'false');
+                    prevBtn.classList.remove('selected');
+                }
+            }
+            // Set new selection
+            btn.setAttribute('aria-pressed', 'true');
+            btn.classList.add('selected');
+            moodSelections[day] = mood;
+            try { localStorage.setItem(storageKey, JSON.stringify(moodSelections)); } catch (e) { console.warn('Failed to save to localStorage:', e); }
+            updateSummary();
+        });
+
+        card.appendChild(btn);
+    });
+
+    cardsContainer.appendChild(card);
+});
+
+/**
+ * Update summary counts displayed in the UI.
+ */
+function updateSummary() {
+    // Count moods
+    const count = { happy: 0, neutral: 0, sad: 0 };
+    Object.values(moodSelections).forEach(m => { if (m in count) count[m]++; });
+
+    happyCountEl.textContent = count.happy;
+    neutralCountEl.textContent = count.neutral;
+    sadCountEl.textContent = count.sad;
+}
+
+// Initialize summary on page load
+updateSummary();
+
+/*=============================================================
+  End of script
+  =============================================================*/
+</script>
+</body>
+</html>

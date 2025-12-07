@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Ensure responsive design -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Tracker Calendar</title>
+    <!-- Minimal favicon (optional) -->
+    <link rel="icon" href="data:image/svg;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHRpdGxlPkZPLzYxPC90aXRsZT48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHN0eWxlPSJmaWxsOiNmZmY7Ii8+PC9zdmc+" />
+    <style>
+        /*==========================*
+         * 1. Global styles        *
+         *==========================*/
+        :root{
+            --primary-bg:#f9f9f9;
+            --header-bg:#4e73df;
+            --header-text:#fff;
+            --current-day-border:#ff6f61;
+            --mood-great:#28a745;
+            --mood-good:#6c757d;
+            --mood-okay:#ffeb3b;
+            --mood-bad:#ff9800;
+            --mood-terrible:#c62828;
+            --text-dark:#212529;
+            --text-light:#6c757d;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{
+            font-family:Arial,sans-serif;padding:1rem;background:var(--primary-bg);
+            color:var(--text-dark);line-height:1.4;
+        }
+        h2{margin-bottom:.5rem;}
+        /*==========================*
+         * 2. Header               *
+         *==========================*/
+        header{
+            display:flex;justify-content:center;align-items:center;margin-bottom:1rem;
+            background:var(--header-bg);border-radius:8px;color:var(--header-text);
+            padding:.5rem 1rem;position:relative;
+        }
+        header button{
+            background:none;border:none;color:inherit;font-size:1.2rem;cursor:pointer;
+            margin:0 .5rem;outline:none;
+        }
+        header button:hover{transform:scale(1.05);}
+        header .today-btn{
+            position:absolute;right:1rem;top:50%;transform:translateY(-50%);
+            background:var(--header-bg);border:1px solid #fff;border-radius:4px;font-size:.9rem;
+            padding:.2rem .5rem;color:#fff;cursor:pointer;
+        }
+        /*==========================*
+         * 3. Calendar container   *
+         *==========================*/
+        .calendar{
+            display:grid;grid-template-columns:repeat(7,1fr);gap:.5rem;
+            width:100%;max-width:700px;margin:0 auto 1rem;
+        }
+        .day-cell{
+            background:#fff;border:1px dashed var(--text-light);border-radius:6px;
+            height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+            font-size:0.9rem;color:var(--text-dark);position:relative;cursor:pointer;
+            transition:transform .2s,box-shadow .2s;
+        }
+        .day-cell.empty:hover{box-shadow:0 0 8px rgba(0,0,0,.1);}
+        .day-cell.invalid{color:var(--text-light);cursor:not-allowed;}
+        .day-cell.today{border:2px solid var(--current-day-border);box-shadow:0 0 10px var(--current-day-border);}
+        .day-cell:focus{outline:2px solid var(--current-day-border);}
+        .day-cell:hover{transform:scale(1.05);}
+        .day-cell .date-num{font-weight:bold;}
+        .day-cell .emoji{font-size:1.5rem;margin-top:.3rem;}
+        /* Emoji row styles */
+        .emoji-picker{
+            display:flex;justify-content:center;gap:1rem;margin-bottom:1rem;
+        }
+        .emoji-btn{
+            font-size:2.5rem;cursor:pointer;transition:transform .2s,box-shadow .2s;
+            padding:.2rem;border-radius:50%;background:#fff;border:2px solid #ccc;
+        }
+        .emoji-btn:hover{transform:scale(1.1);}
+        .emoji-btn.active{border-color:var(--current-day-border);box-shadow:0 0 8px var(--current-day-border);}
+        /* Stats section */
+        .stats{
+            width:100%;max-width:700px;margin:0 auto;padding:.5rem;
+            background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);
+        }
+        .stat-card{
+            display:flex;justify-content:space-between;padding:.5rem 1rem;border-bottom:1px solid #eee;
+        }
+        .stat-card:last-child{border-bottom:none;}
+        .stat-card span{font-weight:bold;color:var(--text-dark);}
+        /* Modal for notes */
+        .modal-overlay{
+            position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);
+            display:flex;justify-content:center;align-items:center;visibility:hidden;opacity:0;
+            transition:opacity .3s,visibility .3s;
+        }
+        .modal{
+            background:#fff;border-radius:8px;padding:1rem;width:90%;max-width:400px;
+            position:relative;box-shadow:0 4px 12px rgba(0,0,0,.2);
+        }
+        .modal h3{margin-bottom:.5rem;}
+        .modal textarea{width:100%;height:80px;border:1px solid #ccc;border-radius:4px;padding:.5rem;font-family:inherit;}
+        .modal .btn-group{display:flex;justify-content:flex-end;margin-top:.5rem;}
+        .modal button{margin-left:.5rem;cursor:pointer;}
+        .modal.show{visibility:visible;opacity:1;}
+        /* Responsive tweaks */
+        @media(max-width:600px){
+            .day-cell{height:60px;font-size:0.8rem;}
+            header{flex-direction:column;padding:.8rem;}
+            header .today-btn{position:relative;top:0;margin-top:.5rem;}
+        }
+    </style>
+</head>
+<body>
+    <!-- Header with navigation -->
+    <header>
+        <button id="prevMonth" aria-label="Previous month">&lt;</button>
+        <h2 id="monthYear" tabindex="0"></h2>
+        <button id="nextMonth" aria-label="Next month">&gt;</button>
+        <button class="today-btn" id="goToday">Today</button>
+    </header>
+    <!-- Emoji picker -->
+    <section class="emoji-picker" role="group" aria-label="Mood selector">
+        <button class="emoji-btn" data-mood="great" aria-label="Great 😄">😄</button>
+        <button class="emoji-btn" data-mood="good" aria-label="Good 🙂">🙂</button>
+        <button class="emoji-btn" data-mood="okay" aria-label="Okay 😐">😐</button>
+        <button class="emoji-btn" data-mood="bad" aria-label="Bad 😔">😔</button>
+        <button class="emoji-btn" data-mood="terrible" aria-label="Terrible 😢">😢</button>
+    </section>
+    <!-- Calendar grid -->
+    <main>
+        <section class="calendar" aria-label="Mood calendar"></section>
+    </main>
+    <!-- Statistics -->
+    <section class="stats" aria-live="polite" aria-atomic="true">
+        <h3>Monthly Summary</h3>
+        <!-- Stats cards will be appended via JS -->
+    </section>
+
+    <!-- Modal for notes -->
+    <div class="modal-overlay" id="noteModal" aria-modal="true" role="dialog" aria-labelledby="modalTitle">
+        <div class="modal">
+            <h3 id="modalTitle">Add/Edit Note</h3>
+            <p><strong id="modalDate"></strong></p>
+            <textarea id="noteText" aria-label="Note text"></textarea>
+            <div class="btn-group">
+                <button id="cancelNote">Cancel</button>
+                <button id="saveNote">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /*====================*
+         * 1. Constants & Utils *
+         *====================*/
+        const moods = {
+            great:   {emoji:"😄", color:"var(--mood-great)",  text:"Great"},
+            good:    {emoji:"🙂", color:"var(--mood-good)",   text:"Good"},
+            okay:    {emoji:"😐", color:"var(--mood-okay)",   text:"Okay"},
+            bad:     {emoji:"😔", color:"var(--mood-bad)",    text:"Bad"},
+            terrible:{emoji:"😢", color:"var(--mood-terrible)",text:"Terrible"}
+        };
+        const calendarEl = document.querySelector('.calendar');
+        const monthYearEl = document.getElementById('monthYear');
+        const prevBtn = document.getElementById('prevMonth');
+        const nextBtn = document.getElementById('nextMonth');
+        const todayBtn = document.getElementById('goToday');
+        const emojiBtns = document.querySelectorAll('.emoji-btn');
+        const noteModal = document.getElementById('noteModal');
+        const modalDateEl = document.getElementById('modalDate');
+        const noteTextEl = document.getElementById('noteText');
+        const cancelNoteBtn = document.getElementById('cancelNote');
+        const saveNoteBtn = document.getElementById('saveNote');
+        const statsEl = document.querySelector('.stats');
+
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth(); // 0-11
+        let activeDate = null; // Date object of selected day
+        let isNoteEditing = false; // flag for edit vs new
+
+        /*====================*
+         * 2. Helper Functions *
+         *====================*/
+        // Convert Date to YYYY-MM-DD string for storage
+        function dateKey(date){ return date.toISOString().split('T')[0]; }
+        // Store entry in localStorage
+        function setEntry(date, mood, note){
+            const key = dateKey(date);
+            localStorage.setItem(key, JSON.stringify({mood, note, timestamp:Date.now()}));
+        }
+        // Retrieve entry
+        function getEntry(date){ const key=dateKey(date); const val=localStorage.getItem(key); return val?JSON.parse(val):null; }
+        // Clear entry
+        function clearEntry(date){ localStorage.removeItem(dateKey(date)); }
+        // Format month/year string
+        function monthYearString(year, month){ const d=new Date(year,month,1); return d.toLocaleString('default',{month:'long', year:'numeric'}); }
+
+        /*====================*
+         * 3. Calendar Render *
+         *====================*/
+        function renderCalendar(){
+            calendarEl.innerHTML=''; // clear previous
+            monthYearEl.textContent=monthYearString(currentYear,currentMonth);
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // Sunday=0
+            const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+            const today = new Date();
+            // Start from Monday (1). Adjust first day accordingly.
+            const startOffset = firstDay===0?6:firstDay-1;
+            // Fill blank cells before first day
+            for(let i=0;i<startOffset;i++) calendarEl.appendChild(createEmptyCell());
+            for(let d=1; d<=daysInMonth; d++){
+                const cell = createDayCell(d);
+                calendarEl.appendChild(cell);
+            }
+            // Add remaining empty cells to complete full weeks
+            const totalCells = calendarEl.children.length;
+            const remainder = totalCells % 7;
+            if(remainder!==0){
+                for(let i=0;i<7-remainder;i++) calendarEl.appendChild(createEmptyCell());
+            }
+            updateStats();
+        }
+
+        function createEmptyCell(){
+            const div=document.createElement('div');
+            div.className='day-cell empty';
+            div.tabIndex="-1";
+            return div;
+        }
+
+        function createDayCell(day){
+            const cell=document.createElement('div');
+            cell.className='day-cell';
+            const date=new Date(currentYear,currentMonth,day);
+            if(date>new Date() || date>new Date()){
+                cell.classList.add('invalid'); // future dates disabled
+            }
+            if(
+                date.getDate()===new Date().getDate() &&
+                date.getMonth()===new Date().getMonth() &&
+                date.getFullYear()===new Date().getFullYear()
+            ){ cell.classList.add('today'); } // highlight today
+            const dateNum=document.createElement('div');
+            dateNum.className='date-num';
+            dateNum.textContent=day;
+            cell.appendChild(dateNum);
+            const entry=getEntry(date);
+            if(entry){
+                const emojiEl=document.createElement('div');
+                emojiEl.className='emoji';
+                emojiEl.textContent=moods[entry.mood]?.emoji||'';
+                emojiEl.style.color=moods[entry.mood]?.color||'#000';
+                cell.appendChild(emojiEl);
+                // Add hover tooltip for note preview
+                if(entry.note){ cell.title = entry.note; }
+            }else{
+                // Show plus icon on hover
+                cell.title = 'Click to log mood';
+            }
+
+            cell.addEventListener('click',(e)=>{handleCellClick(date);});
+            return cell;
+        }
+
+        /*====================*
+         * 4. Interaction Handlers *
+         *====================*/
+        function handleCellClick(date){
+            const today = new Date();
+            const isFuture = date>new Date();
+            if(isFuture){ return; }
+            activeDate = date;
+            // Show emoji selector only if no mood logged
+            const entry = getEntry(date);
+            if(!entry){
+                openEmojiSelector(date);
+            }else{
+                // Offer edit via modal
+                openNoteModal(date, entry.note);
+            }
+        }
+
+        function openEmojiSelector(date){
+            // Highlight active emoji by clicking
+            emojiBtns.forEach(btn=>{
+                btn.classList.remove('active');
+                btn.addEventListener('click',(e)=>{applyMood(date,btn.dataset.mood);});
+            });
+        }
+
+        function applyMood(date, mood){
+            // Prompt optional note first
+            const note = prompt(`Add a note for ${dateKey(date)}? (Optional)`);
+            setEntry(date, mood, note||'');
+            // Remove active states
+            emojiBtns.forEach(btn=>btn.classList.remove('active'));
+            // Re-render cell
+            renderCalendar();
+            const entry = getEntry(date);
+            // Show success animation (simple flash)
+            const cell = Array.from(calendarEl.children).find(c=>c.querySelector('.date-num')?.textContent==date.getDate().toString());
+            if(cell){ cell.scrollIntoView({behavior:'smooth',block:'center'}); }
+        }
+
+        // Modal for adding/editing note
+        function openNoteModal(date, currentNote){
+            isNoteEditing=true;
+            modalDateEl.textContent = dateKey(date);
+            noteTextEl.value=currentNote;
+            noteModal.classList.add('show');
+            noteTextEl.focus();
+        }
+        cancelNoteBtn.addEventListener('click',()=>{noteModal.classList.remove('show');});
+        saveNoteBtn.addEventListener('click',()=>{
+            const newNote = noteTextEl.value.trim();
+            if(activeDate){
+                const entry= getEntry(activeDate);
+                if(entry){
+                    setEntry(activeDate, entry.mood, newNote);
+                    renderCalendar();
+                }
+            }
+            noteModal.classList.remove('show');
+        });
+
+        /*====================*
+         * 5. Navigation *
+         *====================*/
+        prevBtn.addEventListener('click',()=>{ currentMonth--; if(currentMonth<0){ currentYear--; currentMonth=11; } renderCalendar(); });
+        nextBtn.addEventListener('click',()=>{ currentMonth++; if(currentMonth>11){ currentYear++; currentMonth=0; } renderCalendar(); });
+        todayBtn.addEventListener('click',()=>{ const today = new Date(); currentYear=today.getFullYear(); currentMonth=today.getMonth(); renderCalendar(); });
+
+        /*====================*
+         * 6. Statistics *
+         *====================*/
+        function updateStats(){
+            // Clean previous stats
+            const existing = statsEl.querySelectorAll('.stat-card');
+            existing.forEach(el=>el.remove());
+            // Count entries by mood
+            const counts = Object.keys(moods).reduce((acc, m)=>{ acc[m]=0; return acc; },{});
+            const keys = Object.keys(localStorage);
+            keys.forEach(k=>{
+                const entry = JSON.parse(localStorage.getItem(k));
+                if(entry && counts.hasOwnProperty(entry.mood)) counts[entry.mood]++;
+            });
+            // Build cards
+            Object.keys(moods).forEach(m=>{ 
+                const card=document.createElement('div'); card.className='stat-card';
+                const label=document.createElement('span'); label.textContent=moods[m].text;
+                const count=document.createElement('span'); count.textContent=counts[m];
+                card.appendChild(label); card.appendChild(count); statsEl.appendChild(card);
+            });
+        }
+
+        /*====================*
+         * 7. Initialize *
+         *====================*/
+        renderCalendar();
+        // Flag to avoid duplicate listeners on emoji buttons
+        let emojiListenersSet=false;
+        if(!emojiListenersSet){
+            emojiBtns.forEach(btn=>btn.addEventListener('click',e=>{/* placeholder */}));
+            emojiListenersSet=true;
+        }
+    </script>
+</body>
+</html>

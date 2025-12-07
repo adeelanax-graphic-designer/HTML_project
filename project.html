@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dream Destination Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='8' fill='teal'/></svg>">
+<style>
+  :root {
+    --primary: #1e88e5;
+    --secondary: #ffb300;
+    --bg: #f9f9f9;
+    --card-bg: #fff;
+    --card-shadow: rgba(0,0,0,0.15);
+  }
+  body {
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    background-color:var(--bg);
+    color:#333;
+    line-height:1.6;
+  }
+  header {
+    background:var(--primary);
+    color:#fff;
+    padding:1rem;
+    text-align:center;
+  }
+  header h1 {
+    margin:0;
+    font-size:1.8rem;
+  }
+  main {
+    padding:1rem;
+    max-width:1200px;
+    margin:auto;
+  }
+  /* Search bar */
+  .search-bar {
+    margin-bottom:1.5rem;
+    display:flex;
+    justify-content:center;
+  }
+  .search-bar input {
+    width:100%;
+    max-width:400px;
+    padding:.5rem 1rem;
+    border:1px solid #ccc;
+    border-radius:20px;
+    font-size:1rem;
+  }
+  /* Grid of cards */
+  .card-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:1.5rem;
+  }
+  .card {
+    background:var(--card-bg);
+    border-radius:8px;
+    box-shadow:0 4px 8px var(--card-shadow);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    transition:transform .2s;
+  }
+  .card:hover {transform:scale(1.02);}
+  .card img {
+    width:100%;
+    height:180px;
+    object-fit:cover;
+  }
+  .card-content {
+    padding:1rem;
+    flex-grow:1;
+  }
+  .card-title {
+    font-size:1.25rem;
+    margin:0 0 .5rem 0;
+  }
+  .card-excerpt {
+    font-size:.95rem;
+    margin:0 0 1rem 0;
+    flex-grow:1;
+  }
+  .card button {
+    align-self:flex-start;
+    background:var(--primary);
+    color:white;
+    border:none;
+    padding:.5rem 1rem;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .card button:hover {background:darken(var(--primary),10%);}
+  /* Modal Styles */
+  .modal {
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,.6);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .3s ease;
+    z-index:1000;
+  }
+  .modal.open {
+    opacity:1;
+    visibility:visible;
+  }
+  .modal-content {
+    background:white;
+    padding:1.5rem;
+    border-radius:8px;
+    max-width:600px;
+    width:90%;
+    max-height:90%;
+    overflow-y:auto;
+    transform:scale(.9);
+    transition:transform .3s ease;
+  }
+  .modal.open .modal-content {transform:scale(1);}
+  .modal-content h2 {margin-top:0;}
+  .modal-close {
+    position:absolute;
+    top:15px;
+    right:20px;
+    background:none;
+    border:none;
+    font-size:1.5rem;
+    cursor:pointer;
+  }
+  @media (max-width:600px) {
+    .card img {height:150px;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dream Destination Explorer</h1>
+</header>
+<main>
+  <!-- Search bar -->
+  <div class="search-bar">
+    <input type="search" id="searchInput" placeholder="Search destinations by country..." aria-label="Search destinations">
+  </div>
+  <!-- Cards container -->
+  <section class="card-grid" id="cardGrid" aria-live="polite" aria-atomic="true">
+    <!-- Cards will be inserted by JS -->
+  </section>
+</main>
+
+<!-- Modal -->
+<div class="modal" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-content">
+    <button class="modal-close" aria-label="Close modal">&times;</button>
+    <h2 id="modalTitle"></h2>
+    <img id="modalImage" src="" alt="" style="width:100%;height:auto;margin:1rem 0;">
+    <p id="modalDescription"></p>
+  </div>
+</div>
+
+<script>
+/* Sample data array; in production this could be fetched from an API */
+const destinations = [
+  {id:1, country:"Japan", title:"Tokyo", short:"A futuristic metropolis blending tradition and tech.", detail:"Tokyo offers bustling streets, historic temples, and world-class cuisine. Explore the serene Meiji Shrine, shop in Akihabara, and sample sushi at Tsukiji Market.", img:"https://picsum.photos/id/1011/400/300"},
+  {id:2, country:"France", title:"Paris", short:"The City of Light invites lovers of art and cuisine.", detail:"Known for the Eiffel Tower, Louvre, and charming cafés, Paris is a must-visit. Stroll along the Seine, enjoy pastries at local patisseries, and indulge in world-renowned wine.", img:"https://picsum.photos/id/1025/400/300"},
+  {id:3, country:"Australia", title:"Sydney", short:"A vibrant city embraced by stunning harbors.", detail:"Sydney offers iconic landmarks like the Opera House and Harbour Bridge. Relax at Bondi Beach, walk through Royal Botanic Gardens, and savor multicultural dining.", img:"https://picsum.photos/id/103/400/300"},
+  {id:4, country:"Brazil", title:"Rio de Janeiro", short:"A vibrant mix of natural beauty and cultural heritage.", detail:"Rio boasts Copacabana beach, Christ the Redeemer statue, and lush Tijuca Forest. Experience samba culture, taste feijoada, and enjoy breathtaking city panoramas.", img:"https://picsum.photos/id/1046/400/300"},
+  {id:5, country:"New Zealand", title:"Queenstown", short:"Adventure capital nestled amid alpine lakes.", detail:"Queenstown is famed for bungee jumping, jet boating, and scenic hiking. Cruise Lake Wakatipu, climb The Remarkables, and savor local craft beer.", img:"https://picsum.photos/id/1060/400/300"},
+  {id:6, country:"Italy", title:"Rome", short:"Ancient ruins meet gastronomic delights.", detail:"Explore the Colosseum, Vatican City, and Pantheon. Indulge in pasta carbonara, gelato, and espresso. Wander cobblestone streets and soak in history.", img:"https://picsum.photos/id/1075/400/300"}
+];
+
+/* Render cards to the grid */
+const cardGrid = document.getElementById('cardGrid');
+function renderCards(list) {
+  cardGrid.innerHTML=''; // clear existing
+  list.forEach(dest=>{
+    const card=document.createElement('article');
+    card.className='card';
+    card.dataset.country=dest.country.toLowerCase(); // for filtering
+    card.innerHTML=`<img src="${dest.img}" alt="Scenic view of ${dest.country}" loading="lazy">
+      <div class="card-content">
+        <h3 class="card-title">${dest.country}</h3>
+        <p class="card-excerpt">${dest.short}</p>
+        <button data-id="${dest.id}" aria-label="Learn more about ${dest.country}">Learn More</button>
+      </div>`;
+    cardGrid.appendChild(card);
+  });
+}
+
+/* Modal handling */
+const modal=document.getElementById('detailModal');
+const modalTitle=document.getElementById('modalTitle');
+const modalImage=document.getElementById('modalImage');
+const modalDescription=document.getElementById('modalDescription');
+const closeButton=document.querySelector('.modal-close');
+
+function openModal(id) {
+  const dest=destinations.find(d=>d.id===id);
+  if (!dest) return;
+  modalTitle.textContent=dest.country;
+  modalTitle.id='modalTitle';
+  modalImage.src=dest.img.replace('400/300','800/600');
+  modalImage.alt=`Full view of ${dest.country}`;
+  modalDescription.textContent=dest.detail;
+  modal.classList.add('open');
+}
+
+function closeModal(){ modal.classList.remove('open'); }
+
+modal.addEventListener('click', e=>{
+  if (e.target===modal || e.target.closest('.modal-close')) closeModal();
+});
+document.addEventListener('keydown', e=>{
+  if (e.key==='Escape' && modal.classList.contains('open')) closeModal();
+});
+
+/* Attach events for Learn More buttons */
+cardGrid.addEventListener('click', e=>{
+  const btn=e.target.closest('button[data-id]');
+  if (!btn) return;
+  const id=parseInt(btn.dataset.id);
+  openModal(id);
+});
+
+/* Search functionality */
+const searchInput=document.getElementById('searchInput');
+searchInput.addEventListener('input', e=>{
+  const query=e.target.value.trim().toLowerCase();
+  const filtered=destinations.filter(d=>d.country.toLowerCase().includes(query));
+  renderCards(filtered);
+});
+
+/* Initial render */
+renderCards(destinations);
+</script>
+</body>
+</html>
